@@ -276,66 +276,170 @@ export default function SettingsComponent({ settings, onSettingsChange, onClose 
           {/* API Configuration Tab */}
           {activeTab === 'api' && (
             <div className="space-y-8">
-              {/* Google Gemini API Configuration */}
+              {/* AI Provider Configuration */}
               <div className={`border rounded-lg p-6 ${settings.theme === 'light'
                 ? 'border-gray-300 bg-white'
                 : 'border-gray-600 bg-gray-700/50'
                 }`}>
-                <div className="flex items-center gap-2 mb-4">
-                  <Key className="w-5 h-5 text-blue-400" />
+                <div className="flex items-center gap-2 mb-6">
+                  <div className={`p-2 rounded-lg ${settings.theme === 'light' ? 'bg-blue-100' : 'bg-blue-900/30'}`}>
+                    <Key className="w-5 h-5 text-blue-500" />
+                  </div>
                   <h2 className={`text-xl font-semibold ${settings.theme === 'light' ? 'text-gray-900' : 'text-white'
                     }`}>
-                    Google Gemini API
+                    {isZh ? 'AI 服务提供商' : 'AI Provider'}
                   </h2>
                 </div>
 
+                {/* Provider Selector */}
+                <div className="grid grid-cols-2 gap-4 mb-6">
+                  <button
+                    onClick={() => {
+                      setLocalSettings(prev => ({
+                        ...prev,
+                        api: {
+                          ...prev.api,
+                          activeProvider: 'google-gemini' as any
+                        }
+                      }));
+                    }}
+                    className={`flex items-center justify-center gap-2 p-4 rounded-xl border-2 transition-all ${localSettings.api.activeProvider === 'google-gemini'
+                      ? 'border-blue-500 bg-blue-500/10 text-blue-500'
+                      : 'border-gray-600 hover:border-gray-500 text-gray-400'
+                      }`}
+                  >
+                    <span className="font-bold">Google Gemini</span>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      // Switch to DeepSeek and auto-configure models
+                      setLocalSettings(prev => ({
+                        ...prev,
+                        api: {
+                          ...prev.api,
+                          activeProvider: 'deepseek' as any,
+                          // Auto-switch models to DeepSeek if they are currently set to Gemini defaults
+                          models: {
+                            ...prev.api.models,
+                            [FeatureType.Interview]: 'deepseek-chat',
+                            [FeatureType.Mentor]: 'deepseek-chat',
+                            [FeatureType.Feedback]: 'deepseek-chat',
+                            [FeatureType.Critique]: 'deepseek-chat',
+                            [FeatureType.Classify]: 'deepseek-chat',
+                            [FeatureType.Rewrite]: 'deepseek-chat',
+                            [FeatureType.ReverseEngineer]: 'deepseek-chat'
+                          }
+                        }
+                      }));
+                      if (isZh) {
+                        showSuccess('已切换至 DeepSeek，相关模型已自动配置');
+                      } else {
+                        showSuccess('Switched to DeepSeek, models auto-configured');
+                      }
+                    }}
+                    className={`flex items-center justify-center gap-2 p-4 rounded-xl border-2 transition-all ${localSettings.api.activeProvider === 'deepseek'
+                      ? 'border-blue-500 bg-blue-500/10 text-blue-500'
+                      : 'border-gray-600 hover:border-gray-500 text-gray-400'
+                      }`}
+                  >
+                    <span className="font-bold">DeepSeek</span>
+                    <span className="text-[10px] bg-blue-500 text-white px-1.5 py-0.5 rounded">Fast</span>
+                  </button>
+                </div>
+
+                {/* API Key Inputs based on selection */}
                 <div className="space-y-4">
-                  <div>
-                    <label className={`block text-sm font-medium mb-2 ${settings.theme === 'light' ? 'text-gray-700' : 'text-gray-200'
-                      }`}>
-                      {isZh ? 'Gemini API Key' : 'Gemini API Key'}
-                    </label>
-                    <div className="relative">
-                      <input
-                        type={showApiKey ? 'text' : 'password'}
-                        value={localSettings.api.geminiApiKey}
-                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateApiKey(e.target.value)}
-                        placeholder={isZh ? '请输入 Google Gemini API Key' : 'Enter Google Gemini API Key'}
-                        className={`w-full px-4 py-2 border rounded-lg pr-12 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${settings.theme === 'light'
-                          ? 'bg-white border-gray-300 text-gray-900 placeholder-gray-400'
-                          : 'bg-gray-900 border-gray-600 text-gray-100 placeholder-gray-400'
-                          }`}
-                      />
-                      <button
-                        onClick={() => setShowApiKey(!showApiKey)}
-                        className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-200 transition-colors"
-                      >
-                        {showApiKey ? '👁️' : '👁️‍🗨️'}
-                      </button>
+
+                  {/* Google Gemini Input */}
+                  {localSettings.api.activeProvider === 'google-gemini' && (
+                    <div className="animate-in fade-in slide-in-from-left-4 duration-300">
+                      <label className={`block text-sm font-medium mb-2 ${settings.theme === 'light' ? 'text-gray-700' : 'text-gray-200'
+                        }`}>
+                        Google Gemini API Key
+                      </label>
+                      <div className="relative">
+                        <input
+                          type={showApiKey ? 'text' : 'password'}
+                          value={localSettings.api.geminiApiKey}
+                          onChange={(e) => updateApiKey(e.target.value)}
+                          placeholder="AIzaSy..."
+                          className={`w-full px-4 py-2 border rounded-lg pr-12 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${settings.theme === 'light'
+                            ? 'bg-white border-gray-300 text-gray-900 placeholder-gray-400'
+                            : 'bg-gray-900 border-gray-600 text-gray-100 placeholder-gray-600'
+                            }`}
+                        />
+                        <button
+                          onClick={() => setShowApiKey(!showApiKey)}
+                          className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-200 transition-colors"
+                        >
+                          {showApiKey ? '👁️' : '👁️‍🗨️'}
+                        </button>
+                      </div>
+                      <p className="mt-2 text-xs text-gray-500">
+                        {isZh ? '国内用户请注意网络连接' : 'Note connection requirements in China'}
+                      </p>
                     </div>
-                    <button
-                      onClick={handleTestConnection}
-                      disabled={testingConnection || !localSettings.api.geminiApiKey}
-                      className={`mt-3 w-full flex items-center justify-center gap-2 px-4 py-2 border rounded-lg transition-all ${testingConnection
-                        ? 'bg-gray-600 cursor-wait'
-                        : localSettings.api.geminiApiKey
-                          ? 'border-blue-500 text-blue-400 hover:bg-blue-600/10'
-                          : 'border-gray-600 text-gray-500 cursor-not-allowed'
-                        }`}
-                    >
-                      {testingConnection ? (
-                        <>
-                          <div className="w-4 h-4 border-2 border-gray-300 border-t-blue-500 rounded-full animate-spin" />
-                          {isZh ? '测试中...' : 'Testing...'}
-                        </>
-                      ) : (
-                        <>
-                          <CheckCircle className="w-4 h-4" />
-                          {isZh ? '测试 API 连接' : 'Test API Connection'}
-                        </>
-                      )}
-                    </button>
-                  </div>
+                  )}
+
+                  {/* DeepSeek Input */}
+                  {localSettings.api.activeProvider === 'deepseek' && (
+                    <div className="animate-in fade-in slide-in-from-right-4 duration-300">
+                      <label className={`block text-sm font-medium mb-2 ${settings.theme === 'light' ? 'text-gray-700' : 'text-gray-200'
+                        }`}>
+                        DeepSeek API Key
+                      </label>
+                      <div className="relative">
+                        <input
+                          type={showApiKey ? 'text' : 'password'}
+                          value={localSettings.api.deepseekApiKey || ''}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setLocalSettings(prev => ({
+                              ...prev,
+                              api: { ...prev.api, deepseekApiKey: val }
+                            }));
+                          }}
+                          placeholder="sk-..."
+                          className={`w-full px-4 py-2 border rounded-lg pr-12 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${settings.theme === 'light'
+                            ? 'bg-white border-gray-300 text-gray-900 placeholder-gray-400'
+                            : 'bg-gray-900 border-gray-600 text-gray-100 placeholder-gray-600'
+                            }`}
+                        />
+                        <button
+                          onClick={() => setShowApiKey(!showApiKey)}
+                          className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-200 transition-colors"
+                        >
+                          {showApiKey ? '👁️' : '👁️‍🗨️'}
+                        </button>
+                      </div>
+                      <p className="mt-2 text-xs text-green-500 flex items-center gap-1">
+                        <CheckCircle size={12} />
+                        {isZh ? '已自动配置 Base URL 和模型' : 'Base URL and models auto-configured'}
+                      </p>
+                    </div>
+                  )}
+
+                  <button
+                    onClick={handleTestConnection}
+                    disabled={testingConnection || (localSettings.api.activeProvider === 'google-gemini' ? !localSettings.api.geminiApiKey : !localSettings.api.deepseekApiKey)}
+                    className={`mt-4 w-full flex items-center justify-center gap-2 px-4 py-2 text-sm border rounded-lg transition-all ${testingConnection
+                      ? 'bg-gray-600 cursor-wait'
+                      : 'border-blue-500 text-blue-400 hover:bg-blue-600/10'
+                      }`}
+                  >
+                    {testingConnection ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-gray-300 border-t-blue-500 rounded-full animate-spin" />
+                        {isZh ? '测试中...' : 'Testing...'}
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle className="w-4 h-4" />
+                        {isZh ? '测试连接' : 'Test Connection'}
+                      </>
+                    )}
+                  </button>
                 </div>
               </div>
 

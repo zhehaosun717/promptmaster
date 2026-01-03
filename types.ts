@@ -68,6 +68,7 @@ export enum ModelType {
 
 export enum ApiProvider {
   GoogleGemini = 'google-gemini',
+  DeepSeek = 'deepseek',
   OpenAI = 'openai',
   Anthropic = 'anthropic',
   Custom = 'custom'
@@ -85,7 +86,7 @@ export interface CustomModel {
   temperature?: number;
 }
 
-// 预定义的Google Gemini模型
+// 预定义的模型列表
 export const PREDEFINED_MODELS: CustomModel[] = [
   {
     id: 'gemini-pro',
@@ -100,6 +101,22 @@ export const PREDEFINED_MODELS: CustomModel[] = [
     provider: ApiProvider.GoogleGemini,
     modelName: ModelType.GeminiFlash,
     description: '快速响应，适合实时交互'
+  },
+  {
+    id: 'deepseek-chat',
+    name: 'DeepSeek Chat (V3)',
+    provider: ApiProvider.DeepSeek,
+    modelName: 'deepseek-chat',
+    description: 'DeepSeek V3 通用大模型，推理能力强',
+    baseUrl: 'https://api.deepseek.com'
+  },
+  {
+    id: 'deepseek-reasoner',
+    name: 'DeepSeek Reasoner (R1)',
+    provider: ApiProvider.DeepSeek,
+    modelName: 'deepseek-reasoner',
+    description: 'DeepSeek R1 推理模型，擅长复杂逻辑',
+    baseUrl: 'https://api.deepseek.com'
   }
 ];
 
@@ -114,8 +131,12 @@ export enum FeatureType {
 }
 
 export interface ApiConfig {
-  // 默认Google Gemini API Key（向后兼容）
+  // 当前激活的首选提供商（用于快捷设置）
+  activeProvider: ApiProvider;
+  // 默认Google Gemini API Key
   geminiApiKey: string;
+  // DeepSeek API Key
+  deepseekApiKey: string;
   // 全局默认设置
   defaultBaseUrl?: string;
   defaultApiKey?: string;
@@ -135,7 +156,9 @@ export interface AppSettings {
 
 // Default API Configuration
 export const DEFAULT_API_CONFIG: ApiConfig = {
+  activeProvider: ApiProvider.GoogleGemini,
   geminiApiKey: '',
+  deepseekApiKey: '',
   defaultBaseUrl: '',
   defaultApiKey: '',
   models: {
@@ -177,6 +200,8 @@ export const getApiKeyForModel = (model: CustomModel, settings: AppSettings): st
   switch (model.provider) {
     case ApiProvider.GoogleGemini:
       return settings.api.geminiApiKey;
+    case ApiProvider.DeepSeek:
+      return settings.api.deepseekApiKey;
     default:
       return settings.api.defaultApiKey || '';
   }

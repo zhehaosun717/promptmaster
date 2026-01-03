@@ -266,39 +266,41 @@ const App: React.FC = () => {
 
       <main className="max-w-6xl mx-auto px-4 py-8">
         {/* API Key Missing Warning Banner */}
-        {stage === AppStage.Home && !settings.api.geminiApiKey && !isImporting && (
-          <div className={`max-w-4xl mx-auto mb-8 p-4 rounded-2xl border flex items-center justify-between gap-4 animate-in fade-in slide-in-from-top-4 ${effectiveSettings.theme === 'light'
+        {stage === AppStage.Home && (
+          (settings.api.activeProvider === 'deepseek' ? !settings.api.deepseekApiKey : !settings.api.geminiApiKey)
+        ) && !isImporting && (
+            <div className={`max-w-4xl mx-auto mb-8 p-4 rounded-2xl border flex items-center justify-between gap-4 animate-in fade-in slide-in-from-top-4 ${effectiveSettings.theme === 'light'
               ? 'bg-amber-50 border-amber-200 shadow-sm'
               : 'bg-amber-900/10 border-amber-500/30'
-            }`}>
-            <div className="flex items-center gap-4">
-              <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${effectiveSettings.theme === 'light'
+              }`}>
+              <div className="flex items-center gap-4">
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${effectiveSettings.theme === 'light'
                   ? 'bg-amber-100 text-amber-600'
                   : 'bg-amber-500/20 text-amber-500'
-                }`}>
-                <Settings size={20} />
-              </div>
-              <div>
-                <h4 className={`font-bold ${effectiveSettings.theme === 'light' ? 'text-amber-800' : 'text-amber-500'
                   }`}>
-                  {language === Language.Chinese ? '需要配置 API Key' : 'API Key Required'}
-                </h4>
-                <p className={`text-sm ${effectiveSettings.theme === 'light' ? 'text-amber-700' : 'text-amber-200/80'
-                  }`}>
-                  {language === Language.Chinese
-                    ? '请先配置您的 Google Gemini API Key 以使用 AI 功能'
-                    : 'Please configure your Google Gemini API Key to use AI features'}
-                </p>
+                  <Settings size={20} />
+                </div>
+                <div>
+                  <h4 className={`font-bold ${effectiveSettings.theme === 'light' ? 'text-amber-800' : 'text-amber-500'
+                    }`}>
+                    {language === Language.Chinese ? '需要配置 API Key' : 'API Key Required'}
+                  </h4>
+                  <p className={`text-sm ${effectiveSettings.theme === 'light' ? 'text-amber-700' : 'text-amber-200/80'
+                    }`}>
+                    {language === Language.Chinese
+                      ? '请先配置您的 Google Gemini API Key 以使用 AI 功能'
+                      : 'Please configure your Google Gemini API Key to use AI features'}
+                  </p>
+                </div>
               </div>
+              <button
+                onClick={() => setIsSettingsOpen(true)}
+                className="px-5 py-2.5 bg-amber-500 hover:bg-amber-600 text-white rounded-xl font-bold text-sm transition-colors shadow-lg shadow-amber-900/20 whitespace-nowrap"
+              >
+                {language === Language.Chinese ? '去配置' : 'Configure'}
+              </button>
             </div>
-            <button
-              onClick={() => setIsSettingsOpen(true)}
-              className="px-5 py-2.5 bg-amber-500 hover:bg-amber-600 text-white rounded-xl font-bold text-sm transition-colors shadow-lg shadow-amber-900/20 whitespace-nowrap"
-            >
-              {language === Language.Chinese ? '去配置' : 'Configure'}
-            </button>
-          </div>
-        )}
+          )}
 
         {stage === AppStage.Home && (
           <div className="flex flex-col items-center justify-center min-h-[60vh] animate-in fade-in slide-in-from-bottom-4 duration-500">

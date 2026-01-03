@@ -1,5 +1,5 @@
 import { GoogleGenAI, Chat, GenerateContentResponse, Type } from "@google/genai";
-import { InterviewResponse, MentorFeedback, Language, Pillar, Suggestion, AppSettings, DEFAULT_APP_SETTINGS, FeatureType, ModelType, getModelById, getApiKeyForModel, getBaseUrlForModel } from "../types";
+import { InterviewResponse, MentorFeedback, Language, Pillar, Suggestion, AppSettings, DEFAULT_APP_SETTINGS, FeatureType, ModelType, getModelById, getApiKeyForModel, getBaseUrlForModel, ApiProvider } from "../types";
 
 // Configuration management
 let currentSettings: AppSettings = DEFAULT_APP_SETTINGS;
@@ -15,7 +15,9 @@ const loadSettings = (): AppSettings => {
         ...parsed,
         api: {
           ...DEFAULT_APP_SETTINGS.api,
+          activeProvider: parsed.api?.activeProvider || DEFAULT_APP_SETTINGS.api.activeProvider,
           geminiApiKey: parsed.api?.geminiApiKey || '',
+          deepseekApiKey: parsed.api?.deepseekApiKey || '', // Load DeepSeek key
           defaultBaseUrl: parsed.api?.defaultBaseUrl || '',
           defaultApiKey: parsed.api?.defaultApiKey || '',
           models: {
@@ -123,9 +125,53 @@ async function callWithRetry<T>(
   }
 }
 
+// Helper for OpenAI-compatible API calls (DeepSeek)
+async function callOpenAICompatible(
+  modelConfig: any,
+  messages: any[],
+  apiKey: string,
+  temperature: number = 0.7,
+  jsonMode: boolean = false
+): Promise<string> {
+  let baseUrl = modelConfig.baseUrl || 'https://api.deepseek.com';
+  // Ensure endpoint path
+  if (!baseUrl.includes('chat/completions')) {
+    baseUrl = `${baseUrl.replace(/\/$/, '')}/chat/completions`;
+  }
+
+  const body: any = {
+    model: modelConfig.modelName,
+    messages,
+    stream: false,
+    temperature
+  };
+
+  if (jsonMode) {
+    body.response_format = { type: 'json_object' };
+  }
+
+  const response = await fetch(baseUrl, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`
+    },
+    body: JSON.stringify(body)
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`API Request Failed (${response.status}): ${errorText}`);
+  }
+
+  const data = await response.json();
+  return data.choices?.[0]?.message?.content || '';
+}
+
 // --- Phase 1: Interview & Generation ---
 
 let interviewChatSession: Chat | null = null;
+let deepseekChatHistory: { role: string; content: string }[] = [];
 
 export const startInterviewSession = (language: Language): void => {
   const modelId = getModelForFeature(FeatureType.Interview);
@@ -135,46 +181,8 @@ export const startInterviewSession = (language: Language): void => {
     throw new Error(`Model configuration not found for feature: ${FeatureType.Interview}`);
   }
 
-  // 目前只支持Gemini模型的聊天功能
-  if (modelConfig.provider !== 'google-gemini' && !modelConfig.modelName.startsWith('gemini-')) {
-    throw new Error(`Chat functionality not supported for provider: ${modelConfig.provider}`);
-  }
-
-  const ai = getAiClient() as GoogleGenAI;
   const langName = language === Language.Chinese ? "Simplified Chinese" : "English";
-
-  interviewChatSession = ai.chats.create({
-    model: modelConfig.modelName,
-    config: {
-      temperature: 0.6, // Fixed: optimal for conversational interview
-      thinkingConfig: {
-        thinkingBudget: 2048
-      },
-      responseMimeType: "application/json",
-      responseSchema: {
-        type: Type.OBJECT,
-        properties: {
-          question: {
-            type: Type.STRING,
-            description: "The concise question to ask the user."
-          },
-          options: {
-            type: Type.ARRAY,
-            items: { type: Type.STRING },
-            description: "Exactly 3 distinct, concise options."
-          },
-          isFinalDraft: {
-            type: Type.BOOLEAN,
-            description: "Set to true ONLY when all 4 pillars are clearly defined."
-          },
-          generatedPrompt: {
-            type: Type.STRING,
-            description: "The final, detailed system prompt text."
-          }
-        },
-        required: ["question", "options", "isFinalDraft"]
-      },
-      systemInstruction: `You are an expert Prompt Engineering Consultant (The Architect).
+  const systemInstruction = `You are an expert Prompt Engineering Consultant (The Architect).
 
       CORE OBJECTIVE:
       Build a "Power Prompt" for the user by systematically gathering 4 Pillars:
@@ -191,25 +199,85 @@ export const startInterviewSession = (language: Language): void => {
 
       LANGUAGE RULES:
       1. You MUST conduct the interview in ${langName}.
-      2. CRITICAL: The final "generatedPrompt" MUST be written in ${langName}, unless the user specifically requests a different language for the target AI.`,
+      2. CRITICAL: The final "generatedPrompt" MUST be written in ${langName}, unless the user specifically requests a different language for the target AI.`;
+
+  // DeepSeek / OpenAI Logic
+  if (modelConfig.provider === ApiProvider.DeepSeek || modelConfig.provider === ApiProvider.OpenAI || modelConfig.provider === ApiProvider.Custom) {
+    deepseekChatHistory = [
+      { role: 'system', content: systemInstruction + `\n\nIMPORTANT: You must respond in valid JSON format.` }
+    ];
+    interviewChatSession = null;
+    return;
+  }
+
+  // Gemini Logic
+  const ai = getAiClient() as GoogleGenAI;
+
+  interviewChatSession = ai.chats.create({
+    model: modelConfig.modelName,
+    config: {
+      temperature: 0.6,
+      responseMimeType: "application/json",
+      responseSchema: {
+        type: Type.OBJECT,
+        properties: {
+          question: { type: Type.STRING },
+          options: { type: Type.ARRAY, items: { type: Type.STRING } },
+          isFinalDraft: { type: Type.BOOLEAN },
+          generatedPrompt: { type: Type.STRING }
+        },
+        required: ["question", "options", "isFinalDraft"]
+      },
+      systemInstruction,
     },
   });
 };
 
 export const sendInterviewMessage = async (message: string, language: Language): Promise<InterviewResponse> => {
-  if (!interviewChatSession) {
+  // Ensure session exists
+  if (!interviewChatSession && deepseekChatHistory.length === 0) {
     startInterviewSession(language);
   }
-  if (!interviewChatSession) throw new Error("Chat session failed to initialize");
 
   try {
-    const response: GenerateContentResponse = await callWithRetry(() =>
-      interviewChatSession!.sendMessage({ message })
-    );
-    const text = response.text || "{}";
+    let responseText = "{}";
+
+    // Dispatch based on active session type
+    if (deepseekChatHistory.length > 0) {
+      // DeepSeek Handling
+      const modelConfig = getModelConfigForFeature(FeatureType.Interview);
+      const apiKey = getApiKeyForModel(modelConfig!, currentSettings);
+
+      // Add user message to history
+      deepseekChatHistory.push({ role: 'user', content: message });
+
+      // Call API
+      responseText = await callOpenAICompatible(
+        modelConfig,
+        deepseekChatHistory,
+        apiKey,
+        0.6,
+        true // Enable JSON mode
+      );
+
+      // Add assistant response to history
+      deepseekChatHistory.push({ role: 'assistant', content: responseText });
+
+    } else if (interviewChatSession) {
+      // Gemini Handling
+      const response: GenerateContentResponse = await callWithRetry(() =>
+        interviewChatSession!.sendMessage({ message })
+      );
+      responseText = response.text || "{}";
+    } else {
+      throw new Error("Session initialized but no valid handler found.");
+    }
 
     try {
-      const json = JSON.parse(text);
+      // Parse JSON safely
+      // Some models might wrap JSON in Markdown code blocks
+      const cleanJson = responseText.replace(/```json\n?|\n?```/g, '').trim();
+      const json = JSON.parse(cleanJson);
       return {
         question: json.question || "...",
         options: Array.isArray(json.options) ? json.options : [],
@@ -217,11 +285,16 @@ export const sendInterviewMessage = async (message: string, language: Language):
         generatedPrompt: json.generatedPrompt
       };
     } catch (parseError) {
-      console.error("JSON Parse Error", text);
-      return { question: "System Error: Could not parse AI response.", options: [], isFinalDraft: false };
+      console.error("JSON Parse Error", responseText);
+      // If parsing fails for DeepSeek, it might be due to thinking tokens or format
+      if (deepseekChatHistory.length > 0) {
+        // Auto-recovery: Inform model to fix JSON
+        // This is complex, for now return error state
+      }
+      return { question: "System Error: Could not parse AI response. Please try again.", options: [], isFinalDraft: false };
     }
   } catch (error) {
-    console.error("Gemini API Error:", error);
+    console.error("API Error:", error);
     throw error;
   }
 };
@@ -242,14 +315,8 @@ export const reverseEngineerContext = async (prompt: string, language: Language)
     throw new Error(`Model configuration not found for feature: ${FeatureType.ReverseEngineer}`);
   }
 
-  const ai = getAiClient(modelId);
   const langName = language === Language.Chinese ? "Simplified Chinese" : "English";
-
-  try {
-    const response = await callWithRetry<GenerateContentResponse>(() => ai.models.generateContent({
-      model: modelConfig.modelName,
-      config: { temperature: 0.3 }, // Fixed: low for consistent reconstruction
-      contents: `Analyze the following prompt and reverse-engineer the "Context Pillars" to serve as a specification for an Editor AI.
+  const contents = `Analyze the following prompt and reverse-engineer the "Context Pillars" to serve as a specification for an Editor AI.
 
         Original Prompt: "${prompt}"
 
@@ -260,7 +327,24 @@ export const reverseEngineerContext = async (prompt: string, language: Language)
         4. Output Format
 
         Output a concise, structured summary in ${langName}.
-        Start immediately with "User Context Analysis:". Do not add preamble.`
+        Start immediately with "User Context Analysis:". Do not add preamble.`;
+
+  if (modelConfig.provider === ApiProvider.DeepSeek || modelConfig.provider === ApiProvider.OpenAI || modelConfig.provider === ApiProvider.Custom) {
+    try {
+      const apiKey = getApiKeyForModel(modelConfig, currentSettings);
+      return await callOpenAICompatible(modelConfig, [{ role: 'user', content: contents }], apiKey, 0.3);
+    } catch (e) {
+      console.error("Context extraction failed (DeepSeek)", e);
+      return "Context inferred from original prompt.";
+    }
+  }
+
+  const ai = getAiClient(modelId);
+  try {
+    const response = await callWithRetry<GenerateContentResponse>(() => ai.models.generateContent({
+      model: modelConfig.modelName,
+      config: { temperature: 0.3 }, // Fixed: low for consistent reconstruction
+      contents
     }));
     return response.text ? response.text.trim() : "Context inferred from original prompt.";
   } catch (e) {
@@ -284,18 +368,13 @@ export const getMentorFeedback = async (
     throw new Error(`Model configuration not found for feature: ${FeatureType.Mentor}`);
   }
 
-  const ai = getAiClient(modelId);
   const langName = language === Language.Chinese ? "Simplified Chinese" : "English";
 
   const ignoreInstruction = ignoredFeedback.length > 0
     ? `CRITICAL: Do NOT repeat any of these previous suggestions: ${JSON.stringify(ignoredFeedback)}.`
     : "";
 
-  try {
-    const response = await callWithRetry<GenerateContentResponse>(() => ai.models.generateContent({
-      model: modelConfig.modelName,
-      config: { temperature: 0.5 }, // Fixed: slightly higher for variety
-      contents: `You are a strict Prompt Mentor.
+  const contents = `You are a strict Prompt Mentor.
         Context: ${context}
         Current Prompt: "${currentPrompt}"
 
@@ -303,7 +382,30 @@ export const getMentorFeedback = async (
         Provide ONE short, specific tip to improve it.
         Keep it under 15 words.
         ${ignoreInstruction}
-        RESPONSE LANGUAGE: ${langName}.`,
+        RESPONSE LANGUAGE: ${langName}.`;
+
+  if (modelConfig.provider === ApiProvider.DeepSeek || modelConfig.provider === ApiProvider.OpenAI || modelConfig.provider === ApiProvider.Custom) {
+    try {
+      const apiKey = getApiKeyForModel(modelConfig, currentSettings);
+      const result = await callOpenAICompatible(
+        modelConfig,
+        [{ role: 'user', content: contents }],
+        apiKey,
+        0.5
+      );
+      return result ? result.trim() : null;
+    } catch (e) {
+      console.warn("Mentor feedback failed (DeepSeek)", e);
+      return null;
+    }
+  }
+
+  const ai = getAiClient(modelId);
+  try {
+    const response = await callWithRetry<GenerateContentResponse>(() => ai.models.generateContent({
+      model: modelConfig.modelName,
+      config: { temperature: 0.5 }, // Fixed: slightly higher for variety
+      contents,
     }));
     return response.text ? response.text.trim() : null;
   } catch (e) {
@@ -326,7 +428,6 @@ export const applySpecificFeedback = async (
     throw new Error(`Model configuration not found for feature: ${FeatureType.Feedback}`);
   }
 
-  const ai = getAiClient(modelId);
   const isZh = language === Language.Chinese;
 
   const lockedInstruction = lockedSegments.length > 0
@@ -351,6 +452,19 @@ export const applySpecificFeedback = async (
     Return ONLY the modified prompt text. No explanations.
     OUTPUT LANGUAGE: ${isZh ? "Simplified Chinese" : "English"}.`;
 
+  if (modelConfig.provider === ApiProvider.DeepSeek || modelConfig.provider === ApiProvider.OpenAI || modelConfig.provider === ApiProvider.Custom) {
+    try {
+      const apiKey = getApiKeyForModel(modelConfig, currentSettings);
+      const result = await callOpenAICompatible(modelConfig, [{ role: 'user', content: contents }], apiKey, 0.2);
+      return result ? result.trim() : currentPrompt;
+    } catch (e) {
+      console.error("Apply feedback failed (DeepSeek)", e);
+      return currentPrompt;
+    }
+  }
+
+  const ai = getAiClient(modelId);
+
   try {
     const response = await callWithRetry<GenerateContentResponse>(() => ai.models.generateContent({
       model: modelConfig.modelName,
@@ -372,17 +486,8 @@ export const getDetailedCritique = async (currentPrompt: string, context: string
     throw new Error(`Model configuration not found for feature: ${FeatureType.Critique}`);
   }
 
-  const ai = getAiClient(modelId);
   const langName = language === Language.Chinese ? "Simplified Chinese" : "English";
-
-  try {
-    const response = await callWithRetry<GenerateContentResponse>(() => ai.models.generateContent({
-      model: modelConfig.modelName,
-      config: {
-        responseMimeType: "application/json",
-        temperature: 0.1 // Fixed: very low for consistent critiques
-      },
-      contents: `You are a meticulous Copy Editor for AI Prompts.
+  const contents = `You are a meticulous Copy Editor for AI Prompts.
             Analyze the "Current Prompt" and find specific sentences or phrases that are vague, weak, or confusing.
 
             Context: ${context}
@@ -403,7 +508,34 @@ export const getDetailedCritique = async (currentPrompt: string, context: string
             1. "originalText" MUST match a substring in the prompt EXACTLY.
             2. Limit to 3-5 most important suggestions.
             3. "suggestedText" must only replace the "originalText".
-            4. Language: ${langName}.`
+            4. Language: ${langName}.`;
+
+  if (modelConfig.provider === ApiProvider.DeepSeek || modelConfig.provider === ApiProvider.OpenAI || modelConfig.provider === ApiProvider.Custom) {
+    try {
+      const apiKey = getApiKeyForModel(modelConfig, currentSettings);
+      // Use JSON mode
+      const result = await callOpenAICompatible(modelConfig, [{ role: 'user', content: contents }], apiKey, 0.1, true);
+      const json = JSON.parse(result);
+      return Array.isArray(json) ? json.map((item: any) => ({
+        ...item,
+        id: Math.random().toString(36).substr(2, 9)
+      })) : [];
+    } catch (e) {
+      console.warn("Critique failed (DeepSeek)", e);
+      return [];
+    }
+  }
+
+  const ai = getAiClient(modelId);
+
+  try {
+    const response = await callWithRetry<GenerateContentResponse>(() => ai.models.generateContent({
+      model: modelConfig.modelName,
+      config: {
+        responseMimeType: "application/json",
+        temperature: 0.1 // Fixed: very low for consistent critiques
+      },
+      contents
     }));
 
     const text = response.text || "[]";
@@ -428,15 +560,32 @@ export const classifyPromptSegment = async (segment: string, fullPrompt: string)
     throw new Error(`Model configuration not found for feature: ${FeatureType.Classify}`);
   }
 
+  const contents = `Classify this prompt segment into: Persona, Task, Context, Format, or Other.
+            Full Prompt: "${fullPrompt}"
+            Target Segment: "${segment}"
+            Return ONLY the word.`;
+
+  if (modelConfig.provider === ApiProvider.DeepSeek || modelConfig.provider === ApiProvider.OpenAI || modelConfig.provider === ApiProvider.Custom) {
+    try {
+      const apiKey = getApiKeyForModel(modelConfig, currentSettings);
+      const text = await callOpenAICompatible(modelConfig, [{ role: 'user', content: contents }], apiKey, 0.1);
+      const normalized = text ? text.trim().toLowerCase() : '';
+      if (normalized.includes('persona')) return Pillar.Persona;
+      if (normalized.includes('task')) return Pillar.Task;
+      if (normalized.includes('context')) return Pillar.Context;
+      if (normalized.includes('format')) return Pillar.Format;
+      return Pillar.Other;
+    } catch (e) {
+      return Pillar.Other;
+    }
+  }
+
   const ai = getAiClient(modelId);
   try {
     const response = await callWithRetry<GenerateContentResponse>(() => ai.models.generateContent({
       model: modelConfig.modelName,
       config: { temperature: 0.1 }, // Fixed: very low for precision edits
-      contents: `Classify this prompt segment into: Persona, Task, Context, Format, or Other.
-            Full Prompt: "${fullPrompt}"
-            Target Segment: "${segment}"
-            Return ONLY the word.`
+      contents
     }));
 
     const text = response.text ? response.text.trim().toLowerCase() : '';
@@ -466,7 +615,6 @@ export const reconstructPrompt = async (
     throw new Error(`Model configuration not found for feature: ${FeatureType.Rewrite}`);
   }
 
-  const ai = getAiClient(modelId);
   const isZh = language === Language.Chinese;
 
   // Case 1: Partial Rewrite (Focus Segment provided)
@@ -486,6 +634,18 @@ export const reconstructPrompt = async (
      3. Do NOT include conversational filler like "Here is the rewritten text".
      4. Language: ${isZh ? "Simplified Chinese" : "English"}.`;
 
+    if (modelConfig.provider === ApiProvider.DeepSeek || modelConfig.provider === ApiProvider.OpenAI || modelConfig.provider === ApiProvider.Custom) {
+      try {
+        const apiKey = getApiKeyForModel(modelConfig, currentSettings);
+        const result = await callOpenAICompatible(modelConfig, [{ role: 'user', content: contents }], apiKey, 0.3);
+        return result ? result.trim() : focusSegment;
+      } catch (e) {
+        console.error("Partial rewrite failed (DeepSeek)", e);
+        return focusSegment;
+      }
+    }
+
+    const ai = getAiClient(modelId);
     try {
       const response = await callWithRetry<GenerateContentResponse>(() => ai.models.generateContent({
         model: modelConfig.modelName,
@@ -525,6 +685,19 @@ export const reconstructPrompt = async (
       Requirement: Output ONLY the improved prompt text. Do not include explanations.
       OUTPUT LANGUAGE: ${isZh ? "Simplified Chinese (简体中文)" : "English"}. THIS IS CRITICAL.`;
 
+  if (modelConfig.provider === ApiProvider.DeepSeek || modelConfig.provider === ApiProvider.OpenAI || modelConfig.provider === ApiProvider.Custom) {
+    try {
+      const apiKey = getApiKeyForModel(modelConfig, currentSettings);
+      const result = await callOpenAICompatible(modelConfig, [{ role: 'user', content: contents }], apiKey, 0.7);
+      return result ? result.trim() : currentPrompt;
+    } catch (e) {
+      console.warn("Full rewrite failed (DeepSeek)", e);
+      return currentPrompt;
+    }
+  }
+
+  const ai = getAiClient(modelId);
+
   const generate = (modelId: string) => {
     const modelConfig = getModelById(modelId, currentSettings.api.customModels);
     return ai.models.generateContent({
@@ -553,4 +726,5 @@ export const reconstructPrompt = async (
       return currentPrompt;
     }
   }
+
 };
