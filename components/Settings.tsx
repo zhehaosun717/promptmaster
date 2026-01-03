@@ -353,7 +353,6 @@ export default function SettingsComponent({ settings, onSettingsChange, onClose 
                       }`}
                   >
                     <span className="font-bold">DeepSeek</span>
-                    <span className="text-[10px] bg-blue-500 text-white px-1.5 py-0.5 rounded">Fast</span>
                   </button>
                 </div>
 
@@ -371,7 +370,7 @@ export default function SettingsComponent({ settings, onSettingsChange, onClose 
                         <input
                           type={showApiKey ? 'text' : 'password'}
                           value={localSettings.api.geminiApiKey}
-                          onChange={(e) => updateApiKey(e.target.value)}
+                          onChange={(e) => setLocalSettings(prev => ({ ...prev, api: { ...prev.api, geminiApiKey: e.target.value } }))}
                           placeholder="AIzaSy..."
                           className={`w-full px-4 py-2 border rounded-lg pr-12 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${settings.theme === 'light'
                             ? 'bg-white border-gray-300 text-gray-900 placeholder-gray-400'
@@ -385,9 +384,7 @@ export default function SettingsComponent({ settings, onSettingsChange, onClose 
                           {showApiKey ? '👁️' : '👁️‍🗨️'}
                         </button>
                       </div>
-                      <p className="mt-2 text-xs text-gray-500">
-                        {isZh ? '国内用户请注意网络连接' : 'Note connection requirements in China'}
-                      </p>
+
                     </div>
                   )}
 
