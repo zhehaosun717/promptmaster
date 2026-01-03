@@ -4,8 +4,8 @@ import react from '@vitejs/plugin-react';
 
 export default defineConfig(({ mode }) => {
   return {
-    // For GitHub Pages deployment
-    base: mode === 'production' ? '/promptmaster-ai/' : '/',
+    // For GitHub Pages deployment with custom domain (sunami.top)
+    base: '/',
     server: {
       port: 5555,
       host: '0.0.0.0',
