@@ -240,7 +240,7 @@ const EditorStage: React.FC<EditorStageProps> = ({ initialPrompt, context, langu
           <span className="opacity-30 blur-[1px] transition-all duration-300">
             {prompt.substring(0, processingSelection.start)}
           </span>
-          <span className="bg-blue-500/20 text-blue-200 border-b-2 border-blue-500 animate-pulse transition-all duration-300 shadow-[0_0_10px_rgba(59,130,246,0.5)]">
+          <span className={`bg-blue-500/20 border-b-2 border-blue-500 animate-pulse transition-all duration-300 shadow-[0_0_10px_rgba(59,130,246,0.5)] ${settings.theme === 'light' ? 'text-blue-700 font-medium' : 'text-blue-200'}`}>
             {prompt.substring(processingSelection.start, processingSelection.end)}
           </span>
           <span className="opacity-30 blur-[1px] transition-all duration-300">
@@ -515,7 +515,7 @@ const EditorStage: React.FC<EditorStageProps> = ({ initialPrompt, context, langu
             style={{
               fontFamily: 'monospace',
               WebkitTextFillColor: isPartialProcessing ? 'unset' : 'transparent',
-              color: isPartialProcessing ? '#e2e8f0' : 'transparent',
+              color: isPartialProcessing ? (settings.theme === 'light' ? '#111827' : '#e2e8f0') : 'transparent',
             }}
           >
             {renderHighlights()}
