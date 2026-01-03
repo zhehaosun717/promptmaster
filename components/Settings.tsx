@@ -123,15 +123,24 @@ export default function SettingsComponent({ settings, onSettingsChange, onClose 
 
   // 测试 API 连接
   const handleTestConnection = async () => {
-    if (!localSettings.api.geminiApiKey) {
+    const isDeepSeek = localSettings.api.activeProvider === 'deepseek';
+    const activeKey = isDeepSeek ? localSettings.api.deepseekApiKey : localSettings.api.geminiApiKey;
+
+    if (!activeKey) {
       showError(isZh ? '请先输入 API Key' : 'Please enter an API Key first');
       return;
     }
 
     setTestingConnection(true);
     try {
-      const { testGeminiConnection } = await import('../services/apiTest');
-      const result = await testGeminiConnection(localSettings.api.geminiApiKey);
+      const apiTest = await import('../services/apiTest');
+      let result;
+
+      if (isDeepSeek) {
+        result = await apiTest.testDeepSeekConnection(activeKey);
+      } else {
+        result = await apiTest.testGeminiConnection(activeKey);
+      }
 
       if (result.success) {
         showSuccess(isZh ? '✅ 连接成功！API Key 有效。' : '✅ Connection successful! API Key is valid.');

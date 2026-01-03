@@ -65,3 +65,62 @@ export async function testGeminiConnection(apiKey: string): Promise<TestConnecti
         };
     }
 }
+
+/**
+ * 测试 DeepSeek/OpenAI 兼容 API 连接
+ */
+export async function testDeepSeekConnection(apiKey: string): Promise<TestConnectionResult> {
+    if (!apiKey || apiKey.trim() === '') {
+        return {
+            success: false,
+            message: 'API Key is empty',
+            error: 'Please provide a valid API Key'
+        };
+    }
+
+    try {
+        const response = await fetch("https://api.deepseek.com/chat/completions", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${apiKey}`
+            },
+            body: JSON.stringify({
+                model: "deepseek-chat",
+                messages: [{ role: "user", content: "Hi" }],
+                max_tokens: 5,
+                stream: false
+            })
+        });
+
+        if (!response.ok) {
+            let errorMsg = `HTTP ${response.status}`;
+            try {
+                const errText = await response.text();
+                // Try to parse JSON error
+                const errJson = JSON.parse(errText);
+                errorMsg = errJson.error?.message || errText;
+            } catch (e) {
+                // Ignore json parse error
+            }
+
+            return {
+                success: false,
+                message: 'DeepSeek Connection Failed',
+                error: errorMsg
+            };
+        }
+
+        return {
+            success: true,
+            message: 'DeepSeek Connection Successful!'
+        };
+
+    } catch (error: unknown) {
+        return {
+            success: false,
+            message: 'Connection Error',
+            error: getErrorMessage(error)
+        };
+    }
+}
