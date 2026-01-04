@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Settings, Globe, Palette, Key, Brain, Save, RotateCcw, Database, Download, Upload, Copy, Check, AlertTriangle, CheckCircle } from 'lucide-react';
 import { useToast } from '../contexts/ToastContext';
-import { AppSettings, DEFAULT_APP_SETTINGS, FeatureType, ModelType, Language, getAllModels, getModelById } from '../types';
+import { AppSettings, DEFAULT_APP_SETTINGS, DEFAULT_API_CONFIG, FeatureType, ModelType, Language, getAllModels, getModelById } from '../types';
 import ModelManager from './ModelManager';
 import { downloadEnvFile, copyEnvContent } from '../utils/envConfig';
 import { getErrorMessage } from '../types/errors'; // Added import for getErrorMessage
@@ -19,6 +19,10 @@ export default function SettingsComponent({ settings, onSettingsChange, onClose 
   const [copySuccess, setCopySuccess] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [testingConnection, setTestingConnection] = useState(false);
+  // Cache for Gemini models to restore user customization
+  const [geminiModelsCache, setGeminiModelsCache] = useState(
+    settings.api.activeProvider === 'google-gemini' ? settings.api.models : DEFAULT_API_CONFIG.models
+  );
 
   const { showSuccess, showError } = useToast();
 
@@ -308,9 +312,18 @@ export default function SettingsComponent({ settings, onSettingsChange, onClose 
                         ...prev,
                         api: {
                           ...prev.api,
-                          activeProvider: 'google-gemini' as any
+                          activeProvider: 'google-gemini' as any,
+                          models: {
+                            ...prev.api.models,
+                            ...geminiModelsCache
+                          }
                         }
                       }));
+                      if (isZh) {
+                        showSuccess('已切换至 Google Gemini，模型配置已恢复');
+                      } else {
+                        showSuccess('Switched to Google Gemini, models restored');
+                      }
                     }}
                     className={`flex items-center justify-center gap-2 p-4 rounded-xl border-2 transition-all ${localSettings.api.activeProvider === 'google-gemini'
                       ? 'border-blue-500 bg-blue-500/10 text-blue-500'
@@ -322,6 +335,10 @@ export default function SettingsComponent({ settings, onSettingsChange, onClose 
 
                   <button
                     onClick={() => {
+                      // Cache current models if we are leaving Gemini
+                      if (localSettings.api.activeProvider === 'google-gemini') {
+                        setGeminiModelsCache(localSettings.api.models);
+                      }
                       // Switch to DeepSeek and auto-configure models
                       setLocalSettings(prev => ({
                         ...prev,
