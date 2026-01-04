@@ -199,8 +199,11 @@ export const startInterviewSession = (language: Language): void => {
 
       LANGUAGE RULES:
       1. You MUST conduct the interview in ${langName}.
-      2. CRITICAL: The final "generatedPrompt" MUST be written in ${langName}, unless the user specifically requests a different language for the target AI.
-      
+      2. CRITICAL: The final "generatedPrompt" MUST be written in ${langName}, unless the user specifically requests a different language for the target AI.`;
+
+  // DeepSeek / OpenAI Logic
+  if (modelConfig.provider === ApiProvider.DeepSeek || modelConfig.provider === ApiProvider.OpenAI || modelConfig.provider === ApiProvider.Custom) {
+    const deepSeekSchema = `
       RESPONSE FORMAT:
       You must respond in valid JSON with the following structure:
       {
@@ -211,10 +214,8 @@ export const startInterviewSession = (language: Language): void => {
       }
       IMPORTANT: Keys must be exactly as shown (lowercase). Do not include markdown formatting.`;
 
-  // DeepSeek / OpenAI Logic
-  if (modelConfig.provider === ApiProvider.DeepSeek || modelConfig.provider === ApiProvider.OpenAI || modelConfig.provider === ApiProvider.Custom) {
     deepseekChatHistory = [
-      { role: 'system', content: systemInstruction + `\n\nIMPORTANT: You must respond in valid JSON format.` }
+      { role: 'system', content: systemInstruction + deepSeekSchema }
     ];
     interviewChatSession = null;
     return;
