@@ -340,16 +340,16 @@ export default function SettingsComponent({ settings, onSettingsChange, onClose 
                         api: {
                           ...prev.api,
                           activeProvider: 'deepseek' as any,
-                          // Auto-switch models to DeepSeek if they are currently set to Gemini defaults
+                          // Auto-switch models to DeepSeek defaults
                           models: {
                             ...prev.api.models,
-                            [FeatureType.Interview]: 'deepseek-chat',
-                            [FeatureType.Mentor]: 'deepseek-chat',
-                            [FeatureType.Feedback]: 'deepseek-chat',
-                            [FeatureType.Critique]: 'deepseek-chat',
-                            [FeatureType.Classify]: 'deepseek-chat',
-                            [FeatureType.Rewrite]: 'deepseek-chat',
-                            [FeatureType.ReverseEngineer]: 'deepseek-chat'
+                            [FeatureType.Interview]: 'deepseek-chat',      // Fast interaction
+                            [FeatureType.Mentor]: 'deepseek-reasoner',     // Reasoning needed (Deep)
+                            [FeatureType.Feedback]: 'deepseek-reasoner',   // Complex instruction following (Deep)
+                            [FeatureType.Critique]: 'deepseek-reasoner',   // Critical analysis (Deep)
+                            [FeatureType.Classify]: 'deepseek-chat',       // Simple classification (Fast)
+                            [FeatureType.Rewrite]: 'deepseek-reasoner',    // Creative rewriting (Deep)
+                            [FeatureType.ReverseEngineer]: 'deepseek-chat' // Fast extraction
                           }
                         }
                       }));
