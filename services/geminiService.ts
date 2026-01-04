@@ -205,7 +205,7 @@ export const startInterviewSession = (language: Language): void => {
       You must respond in valid JSON with the following structure:
       {
         "question": "The question to ask the user",
-        "options": ["Option A", "Option B", "Option C"], // Provide exactly 3 distinct choices
+        "options": ["<Specific Choice 1>", "<Specific Choice 2>", "<Specific Choice 3>"], // Generate exactly 3 distinct, context-relevant choices based on your question
         "isFinalDraft": boolean, // Set to true only when you have collected all 4 pillars and are ready to generate the final prompt
         "generatedPrompt": "string" // The full prompt, only required if isFinalDraft is true
       }
