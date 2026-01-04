@@ -319,11 +319,6 @@ export default function SettingsComponent({ settings, onSettingsChange, onClose 
                           }
                         }
                       }));
-                      if (isZh) {
-                        showSuccess('已切换至 Google Gemini，模型配置已恢复');
-                      } else {
-                        showSuccess('Switched to Google Gemini, models restored');
-                      }
                     }}
                     className={`flex items-center justify-center gap-2 p-4 rounded-xl border-2 transition-all ${localSettings.api.activeProvider === 'google-gemini'
                       ? 'border-blue-500 bg-blue-500/10 text-blue-500'
@@ -358,11 +353,6 @@ export default function SettingsComponent({ settings, onSettingsChange, onClose 
                           }
                         }
                       }));
-                      if (isZh) {
-                        showSuccess('已切换至 DeepSeek，相关模型已自动配置');
-                      } else {
-                        showSuccess('Switched to DeepSeek, models auto-configured');
-                      }
                     }}
                     className={`flex items-center justify-center gap-2 p-4 rounded-xl border-2 transition-all ${localSettings.api.activeProvider === 'deepseek'
                       ? 'border-blue-500 bg-blue-500/10 text-blue-500'
