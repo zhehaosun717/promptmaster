@@ -199,7 +199,16 @@ export const startInterviewSession = (language: Language): void => {
 
       LANGUAGE RULES:
       1. You MUST conduct the interview in ${langName}.
-      2. CRITICAL: The final "generatedPrompt" MUST be written in ${langName}, unless the user specifically requests a different language for the target AI.`;
+      2. CRITICAL: The final "generatedPrompt" MUST be written in ${langName}, unless the user specifically requests a different language for the target AI.
+      
+      RESPONSE FORMAT:
+      You must respond in valid JSON with the following structure:
+      {
+        "question": "The question to ask the user",
+        "options": ["Option 1", "Option 2", ...], // Optional suggested answers
+        "isFinalDraft": boolean, // Set to true only when you have collected all 4 pillars and are ready to generate the final prompt
+        "generatedPrompt": "string" // The full prompt, only required if isFinalDraft is true
+      }`;
 
   // DeepSeek / OpenAI Logic
   if (modelConfig.provider === ApiProvider.DeepSeek || modelConfig.provider === ApiProvider.OpenAI || modelConfig.provider === ApiProvider.Custom) {
