@@ -25,7 +25,7 @@ export async function testGeminiConnection(apiKey: string): Promise<TestConnecti
         // 发送一个简单的测试请求
         // 使用 models.generateContent 替代 getGenerativeModel
         const result = await genAI.models.generateContent({
-            model: 'gemini-pro',
+            model: 'gemini-1.5-flash',
             contents: 'Hello'
         });
 
