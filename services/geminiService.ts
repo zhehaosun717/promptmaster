@@ -312,8 +312,8 @@ export const sendInterviewMessage = async (message: string, language: Language):
 
 export const generateFinalDraft = async (language: Language): Promise<string> => {
   const msg = language === Language.Chinese
-    ? "我们已经讨论够了。请生成最终的详细提示词。请务必将角色、任务、背景和格式这四个要素整合成一段完整、详细、可直接使用的指令。**重要：生成的提示词内容本身必须使用简体中文书写**（除非用户在对话中明确指定了生成其他语言的提示词）。"
-    : "We have discussed enough. Please generate the final detailed prompt. Combine Persona, Task, Context, and Format into a single, comprehensive instruction block.";
+    ? "我们已经讨论够了。请生成最终的详细提示词。请严格按照以下结构组织内容：\n\n# 角色 (Role)\n[在此处定义 Persona]\n\n# 任务 (Task)\n[在此处定义核心任务]\n\n# 背景 (Context)\n[在此处定义背景信息]\n\n# 格式 (Format)\n[在此处定义约束与输出格式]\n\n请确保将这四个要素完整地整合进上述结构中。**重要：生成的提示词内容本身必须使用简体中文书写**。"
+    : "We have discussed enough. Please generate the final detailed prompt following this strict structure:\n\n# Role\n[Define Persona]\n\n# Task\n[Define Task]\n\n# Context\n[Define Context]\n\n# Format\n[Define Constraints & Format]";
   const response = await sendInterviewMessage(msg, language);
   return response.generatedPrompt || response.question;
 };
