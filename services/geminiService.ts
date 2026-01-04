@@ -205,10 +205,11 @@ export const startInterviewSession = (language: Language): void => {
       You must respond in valid JSON with the following structure:
       {
         "question": "The question to ask the user",
-        "options": ["Option 1", "Option 2", ...], // Optional suggested answers
+        "options": ["Option A", "Option B", "Option C"], // Provide exactly 3 distinct choices
         "isFinalDraft": boolean, // Set to true only when you have collected all 4 pillars and are ready to generate the final prompt
         "generatedPrompt": "string" // The full prompt, only required if isFinalDraft is true
-      }`;
+      }
+      IMPORTANT: Keys must be exactly as shown (lowercase). Do not include markdown formatting.`;
 
   // DeepSeek / OpenAI Logic
   if (modelConfig.provider === ApiProvider.DeepSeek || modelConfig.provider === ApiProvider.OpenAI || modelConfig.provider === ApiProvider.Custom) {
@@ -288,8 +289,8 @@ export const sendInterviewMessage = async (message: string, language: Language):
       const cleanJson = responseText.replace(/```json\n?|\n?```/g, '').trim();
       const json = JSON.parse(cleanJson);
       return {
-        question: json.question || "...",
-        options: Array.isArray(json.options) ? json.options : [],
+        question: json.question || json.Question || "...",
+        options: Array.isArray(json.options) ? json.options.slice(0, 3) : [],
         isFinalDraft: !!json.isFinalDraft,
         generatedPrompt: json.generatedPrompt
       };
